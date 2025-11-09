@@ -1,0 +1,10 @@
+evaluate
+datasets
+transformers
+torch
+sentencepiece
+anthropic
+nltk
+absl-py
+rouge_score
+bert_score
