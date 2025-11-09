@@ -8,3 +8,4 @@ nltk
 absl-py
 rouge_score
 bert_score
+python-dotenv

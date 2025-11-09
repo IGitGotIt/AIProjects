@@ -3,9 +3,13 @@ import anthropic
 import evaluate
 from datasets import Dataset
 import random
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize Anthropic client
-client = anthropic.Anthropic(api_key="")
+client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # Load BERTScore for supplementary eval (semantic similarity to reference)
 bertscore = evaluate.load("bertscore")

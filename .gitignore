@@ -1,0 +1,7 @@
+LLMSupportEval/venv
+
+# Environment variables (contains API keys)
+.env
+*.env
+.env.local
+
