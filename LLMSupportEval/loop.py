@@ -16,7 +16,7 @@ bertscore = evaluate.load("bertscore")
 
 # Step 1: Define the task (e.g., generate a product description; reference is human-written)
 task_prompt = "Generate a engaging 50-word description for a wireless earbuds product."
-reference_output = "These sleek wireless earbuds deliver crystal-clear sound with noise cancellation, perfect for workouts or commutes. Battery lasts 20 hours, and they're sweat-resistant. Comfortable fit for all-day wear—your new audio essential!"
+reference_output = "I like Bose earbuds"
 
 # Initial prompt (to optimize)
 initial_prompt = task_prompt  # Start simple; we'll refine it
@@ -109,7 +109,7 @@ def optimization_loop(initial_prompt, reference, max_iterations=3):
             'output': current_output,
             'score': initial_judge_score
         })
-        
+        print(history)
         if new_score > best_score:
             current_prompt = new_prompt
             best_score = new_score
@@ -120,11 +120,32 @@ def optimization_loop(initial_prompt, reference, max_iterations=3):
 
     # Final best
     final_output = generate_output(current_prompt)
-    final_score = llm_judge_with_cot(final_output, reference)
+    final_judge_score = llm_judge_with_cot(final_output, reference)
+    final_bert_score = bertscore.compute(predictions=[final_output], references=[reference], lang='en')
+
+    print(f"\n{'='*60}")
+    print(f"FINAL RESULTS")
+    print(f"{'='*60}")
     print(f"\nFinal Prompt: {current_prompt}")
-    print(f"Final Output: {final_output}")
-    print(f"Final Score: {final_score:.2f}")
-    return history, final_output
+    print(f"\nFinal Output: {final_output}")
+    print(f"\nReference Output: {reference}")
+    print(f"\n{'='*60}")
+    print(f"EVALUATION METRICS")
+    print(f"{'='*60}")
+    print(f"LLM Judge Score (CoT):     {final_judge_score:.2f}/10")
+    print(f"BERTScore Precision:       {final_bert_score['precision'][0]:.4f}")
+    print(f"BERTScore Recall:          {final_bert_score['recall'][0]:.4f}")
+    print(f"BERTScore F1:              {final_bert_score['f1'][0]:.4f}")
+    print(f"Combined Score:            {(final_judge_score + final_bert_score['f1'][0] * 10) / 2:.2f}/10")
+    print(f"{'='*60}\n")
+
+    return history, final_output, {
+        'judge_score': final_judge_score,
+        'bert_precision': final_bert_score['precision'][0],
+        'bert_recall': final_bert_score['recall'][0],
+        'bert_f1': final_bert_score['f1'][0],
+        'combined_score': (final_judge_score + final_bert_score['f1'][0] * 10) / 2
+    }
 
 # Run the loop
-history, final_output = optimization_loop(initial_prompt, reference_output)
+history, final_output, metrics = optimization_loop(initial_prompt, reference_output)
