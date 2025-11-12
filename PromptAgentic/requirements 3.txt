@@ -1,0 +1,7 @@
+crewai
+anthropic
+python-dotenv
+evaluate
+datasets
+transformers
+torch

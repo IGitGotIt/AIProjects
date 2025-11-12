@@ -1,0 +1,6 @@
+crewai
+openai
+evaluate
+datasets
+transformers
+torch

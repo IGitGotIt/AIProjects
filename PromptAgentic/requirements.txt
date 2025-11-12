@@ -1,0 +1,10 @@
+# Python 3.9 compatible versions
+crewai<0.2.0
+anthropic
+python-dotenv
+evaluate
+datasets
+transformers
+torch
+bert-score
+cohere
