@@ -10,19 +10,98 @@
 import UIKit
 import Speech
 import AVFoundation
+import NaturalLanguage
 
 class ViewController: UIViewController, SFSpeechRecognizerDelegate {
     let audioEngine = AVAudioEngine()
     let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     var recognitionTask: SFSpeechRecognitionTask?
+    let tagger = NLTagger(tagSchemes: [.nameType])
+    var organizationImageView: UIImageView!
+
+    // Vonage media manager
+    var vonageManager: VonageMediaManager?
+    var videoContainerView: UIView!
+
+    // TODO: Replace these with your actual Vonage credentials
+    private let vonageApiKey = "YOUR_API_KEY"
+    private let vonageSessionId = "YOUR_SESSION_ID"
+    private let vonageToken = "YOUR_TOKEN"
     
     override func viewDidLoad() {
         super.viewDidLoad()
         speechRecognizer?.delegate = self
-        
+
+        // Setup video container view for Vonage
+        setupVideoContainerView()
+
+        // Setup organization image view
+        setupOrganizationImageView()
+
+        // Initialize Vonage manager
+        setupVonageManager()
+
         // Request permissions before starting
         requestSpeechRecognitionPermission()
+    }
+
+    func setupVideoContainerView() {
+        videoContainerView = UIView()
+        videoContainerView.backgroundColor = .black
+        videoContainerView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(videoContainerView)
+
+        // Position video container at the top half of the screen
+        NSLayoutConstraint.activate([
+            videoContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            videoContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            videoContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            videoContainerView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5)
+        ])
+    }
+
+    func setupVonageManager() {
+        vonageManager = VonageMediaManager(
+            apiKey: vonageApiKey,
+            sessionId: vonageSessionId,
+            token: vonageToken
+        )
+
+        // Connect to Vonage session
+        vonageManager?.connect { [weak self] success, error in
+            if success {
+                print("Connected to Vonage session")
+
+                // Start publishing video
+                DispatchQueue.main.async {
+                    self?.vonageManager?.startPublishing(in: self?.videoContainerView ?? UIView()) { published in
+                        if published {
+                            print("Started publishing video")
+                        } else {
+                            print("Failed to start publishing")
+                        }
+                    }
+                }
+            } else {
+                print("Failed to connect to Vonage session: \(error?.localizedDescription ?? "Unknown error")")
+            }
+        }
+    }
+
+    func setupOrganizationImageView() {
+        organizationImageView = UIImageView()
+        organizationImageView.contentMode = .scaleAspectFit
+        organizationImageView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(organizationImageView)
+
+        // Center the image view in the parent view
+        NSLayoutConstraint.activate([
+            organizationImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            organizationImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            organizationImageView.widthAnchor.constraint(equalToConstant: 200),
+            organizationImageView.heightAnchor.constraint(equalToConstant: 200)
+        ])
     }
     
     func requestSpeechRecognitionPermission() {
@@ -95,6 +174,9 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
                 let caption = result.bestTranscription.formattedString
                 DispatchQueue.main.async {
                     print("Caption: \(caption)") // Update UI label here
+
+                    // Analyze the transcribed text for organizations
+                    self.analyzeTextForOrganizations(caption)
                 }
             }
             
@@ -114,6 +196,56 @@ class ViewController: UIViewController, SFSpeechRecognizerDelegate {
         }
     }
     
+    func analyzeTextForOrganizations(_ text: String) {
+        tagger.string = text
+
+        var organizations: [String] = []
+
+        tagger.enumerateTags(in: text.startIndex..<text.endIndex,
+                           unit: .word,
+                           scheme: .nameType,
+                           options: [.omitWhitespace, .omitPunctuation, .joinNames]) { tag, tokenRange in
+            if let tag = tag, tag == .organizationName {
+                let organization = String(text[tokenRange])
+                organizations.append(organization)
+                print("Found organization: \(organization)")
+            }
+            return true
+        }
+
+        // Check for images for each organization found
+        for organization in organizations {
+            loadOrganizationImage(for: organization)
+        }
+    }
+
+    func loadOrganizationImage(for organizationName: String) {
+        // Format the organization name to match asset naming convention
+        // e.g., "Apple" -> "Apple-Org"
+        let imageName = "\(organizationName)-Org"
+
+        // Try to load the image from assets
+        if let image = UIImage(named: imageName) {
+            DispatchQueue.main.async {
+                // Display in UIImageView
+                self.organizationImageView.image = image
+                print("Loaded image: \(imageName)")
+
+                // Apply as video background using Vonage Media Transformer
+                self.vonageManager?.applyBackgroundImage(image)
+                print("Applied background image to video: \(imageName)")
+            }
+        } else {
+            print("Image not found in assets: \(imageName)")
+
+            // Clear background if no image found
+            DispatchQueue.main.async {
+                self.organizationImageView.image = nil
+                self.vonageManager?.clearBackground()
+            }
+        }
+    }
+
     func speechRecognizer(_ recognizer: SFSpeechRecognizer, didFinishRecognition recognitionResult: SFSpeechRecognitionResult, error: Error?) {
         // Handle final result if needed
     }
